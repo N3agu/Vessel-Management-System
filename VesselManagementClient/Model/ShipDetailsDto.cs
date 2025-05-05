@@ -1,0 +1,7 @@
+﻿namespace VesselManagementClient.Model
+{
+    public class ShipDetailsDto : ShipDto
+    {
+        public List<OwnerDto> Owners { get; set; } = new List<OwnerDto>();
+    }
+}
