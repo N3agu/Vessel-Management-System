@@ -1,0 +1,43 @@
+﻿<Window x:Class="VesselManagementClient.View.AddOwnerWindow"
+            xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+            xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+            xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+            xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+            xmlns:local="clr-namespace:VesselManagementClient.View"
+            xmlns:vm="clr-namespace:VesselManagementClient.ViewModel"
+            xmlns:ui="http://schemas.modernwpf.com/2019"
+            mc:Ignorable="d"
+            ui:WindowHelper.UseModernWindowStyle="True"
+            Title="{Binding WindowTitle}" Height="250" Width="400"
+            WindowStartupLocation="CenterOwner" ResizeMode="NoResize" ShowInTaskbar="False"
+            d:DataContext="{d:DesignInstance Type=vm:AddOwnerViewModel, IsDesignTimeCreatable=True}">
+    <Grid Margin="15">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <Label Grid.Row="0" Grid.Column="0" Content="_Name:" Target="{Binding ElementName=txtName}" VerticalAlignment="Center"/>
+        <TextBox Grid.Row="0" Grid.Column="1" x:Name="txtName"
+                     Text="{Binding OwnerName, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}"
+                     Margin="5"/>
+
+        <StackPanel Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,15,0,5">
+            <ui:ProgressRing IsActive="{Binding IsLoading}" Height="20" Width="20" Margin="0,0,10,0" VerticalAlignment="Center"/>
+            <Button Content="_Save" Command="{Binding SaveCommand}" IsDefault="True" Style="{StaticResource AccentButtonStyle}" MinWidth="75" Margin="0,0,10,0"/>
+            <Button Content="_Cancel" Command="{Binding CancelCommand}" IsCancel="True" MinWidth="75"/>
+        </StackPanel>
+
+        <StatusBar Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2">
+            <StatusBarItem>
+                <TextBlock Text="{Binding StatusMessage}" />
+            </StatusBarItem>
+        </StatusBar>
+
+    </Grid>
+</Window>

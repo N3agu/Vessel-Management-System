@@ -18,42 +18,49 @@ namespace VesselManagementClient
             // Subscribe to ViewModel events to open windows
             if (this.DataContext is MainViewModel mainViewModel)
             {
+                mainViewModel.OpenAddOwnerRequested += MainViewModel_OpenAddOwnerRequested; // <-- NEW SUBSCRIPTION
                 mainViewModel.OpenAddEditShipRequested += MainViewModel_OpenAddEditShipRequested;
                 mainViewModel.OpenShipDetailsRequested += MainViewModel_OpenShipDetailsRequested;
             }
         }
 
-        private void MainViewModel_OpenAddEditShipRequested(object? sender, ShipDto? shipToEdit)
+        private void MainViewModel_OpenAddOwnerRequested(object? sender, EventArgs e)
         {
-            // Create the ViewModel for the dialog
-            // Ideally, resolve ApiService via DI if set up, otherwise create new
-            var apiService = new ApiService();
-            var addEditViewModel = new AddEditShipViewModel(apiService, shipToEdit);
-
-            // Create and show the dialog window
-            var dialog = new AddEditShipWindow(addEditViewModel)
+            var apiService = new ApiService(); // Or use DI
+            var addOwnerViewModel = new AddOwnerViewModel(apiService);
+            var dialog = new AddOwnerWindow(addOwnerViewModel)
             {
-                Owner = this // Set owner to center the dialog over the main window
+                Owner = this
             };
-            dialog.ShowDialog(); // Show as modal dialog
+            dialog.ShowDialog();
 
-            // After the dialog closes, refresh the ship list in the main view model
+            // After the dialog closes, refresh the owner list
             if (this.DataContext is MainViewModel mainViewModel)
             {
-                // Use Dispatcher if the event handler is not on the UI thread,
-                // but in this case, it should be fine.
+                _ = mainViewModel.OwnersListVM.LoadOwnersAsync(); // Refresh list
+            }
+        }
+
+
+        private void MainViewModel_OpenAddEditShipRequested(object? sender, ShipDto? shipToEdit)
+        {
+            var apiService = new ApiService(); // Or use DI
+            var addEditViewModel = new AddEditShipViewModel(apiService, shipToEdit);
+            var dialog = new AddEditShipWindow(addEditViewModel) { Owner = this };
+            dialog.ShowDialog();
+
+            // After the dialog closes, refresh the ship list
+            if (this.DataContext is MainViewModel mainViewModel)
+            {
                 _ = mainViewModel.ShipsListVM.LoadShipsAsync(); // Refresh list
             }
         }
 
         private void MainViewModel_OpenShipDetailsRequested(object? sender, int shipId)
         {
-            var apiService = new ApiService();
+            var apiService = new ApiService(); // Or use DI
             var detailsViewModel = new ShipDetailsDialogViewModel(apiService, shipId);
-            var dialog = new ShipDetailsDialog(detailsViewModel)
-            {
-                Owner = this
-            };
+            var dialog = new ShipDetailsDialog(detailsViewModel) { Owner = this };
             dialog.ShowDialog();
         }
     }
