@@ -93,3 +93,6 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+// Thanks to https://stackoverflow.com/a/70026704
+public partial class Program { }

@@ -6,6 +6,9 @@ MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VesselManagementApi", "VesselManagementApi.csproj", "{FFE138DA-7600-45B0-8747-F1686A3BF539}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VesselManagementApi.Tests", "..\VesselManagementApi.Tests\VesselManagementApi.Tests.csproj", "{CA9E71ED-4747-413B-B4B0-19E3C0DDEDF1}"
+	ProjectSection(ProjectDependencies) = postProject
+		{FFE138DA-7600-45B0-8747-F1686A3BF539} = {FFE138DA-7600-45B0-8747-F1686A3BF539}
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
