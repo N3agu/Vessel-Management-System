@@ -1,7 +1,7 @@
 ﻿using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
-namespace VesselManagementClient.ViewModels
+namespace VesselManagementClient.ViewModel
 {
     public abstract class BaseViewModel : INotifyPropertyChanged
     {
