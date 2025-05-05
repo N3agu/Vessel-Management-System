@@ -69,7 +69,7 @@ namespace VesselManagementApi.Controllers
         }
 
         /// <summary>
-        /// Deletes an owner and their associations with ships. (Requirement 6)
+        /// Deletes an owner and their associations with ships.
         /// </summary>
         /// <param name="id">The ID of the owner to delete.</param>
         /// <returns>No content if successful.</returns>
