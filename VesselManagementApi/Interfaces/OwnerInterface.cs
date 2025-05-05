@@ -4,11 +4,11 @@ using VesselManagementApi.Models;
 
 namespace VesselManagementApi.Interfaces
 {
-    public class OwnerRepository : IOwnerInterface
+    public class OwnerInterface : IOwnerInterface
     {
         private readonly VesselManagementDbContext _context;
 
-        public OwnerRepository(VesselManagementDbContext context)
+        public OwnerInterface(VesselManagementDbContext context)
         {
             _context = context;
         }
