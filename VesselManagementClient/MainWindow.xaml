@@ -1,12 +1,26 @@
 ﻿<Window x:Class="VesselManagementClient.MainWindow"
-        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:local="clr-namespace:VesselManagementClient"
-        mc:Ignorable="d"
-        Title="MainWindow" Height="450" Width="800">
+            xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+            xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+            xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+            xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+            xmlns:local="clr-namespace:VesselManagementClient"
+            xmlns:views="clr-namespace:VesselManagementClient.View"
+            xmlns:vm="clr-namespace:VesselManagementClient.ViewModel"
+            xmlns:ui="http://schemas.modernwpf.com/2019"
+            mc:Ignorable="d"
+            ui:WindowHelper.UseModernWindowStyle="True"
+            Title="Vessel Management Client" Height="600" Width="900">
+    <Window.DataContext>
+        <vm:MainViewModel/>
+    </Window.DataContext>
     <Grid>
-
+        <TabControl>
+            <TabItem Header="Ships">
+                <views:ShipsListView DataContext="{Binding ShipsListVM}"/>
+            </TabItem>
+            <TabItem Header="Owners">
+                <views:OwnersListView DataContext="{Binding OwnersListVM}"/>
+            </TabItem>
+        </TabControl>
     </Grid>
 </Window>

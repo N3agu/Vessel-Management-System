@@ -1,0 +1,58 @@
+﻿<Window x:Class="VesselManagementClient.View.ShipDetailsDialog"
+            xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+            xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+            xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+            xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+            xmlns:local="clr-namespace:VesselManagementClient.View"
+            xmlns:vm="clr-namespace:VesselManagementClient.ViewModel"
+            xmlns:ui="http://schemas.modernwpf.com/2019"
+            mc:Ignorable="d"
+            ui:WindowHelper.UseModernWindowStyle="True"
+            Title="Ship Details" Height="400" Width="400"
+            WindowStartupLocation="CenterOwner" ResizeMode="NoResize" ShowInTaskbar="False"
+            d:DataContext="{d:DesignInstance Type=vm:ShipDetailsDialogViewModel, IsDesignTimeCreatable=True}">
+    <Grid Margin="15">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <ui:ProgressRing IsActive="{Binding IsLoading}" HorizontalAlignment="Center" VerticalAlignment="Center" Grid.RowSpan="2"/>
+
+        <StackPanel Grid.Row="0" DataContext="{Binding ShipDetails}" Visibility="{Binding IsLoading, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}">
+            <TextBlock Text="{Binding Name}" Style="{StaticResource TitleTextBlockStyle}" Margin="0,0,0,5"/>
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="IMO:" FontWeight="SemiBold" Margin="0,0,5,0"/>
+                <TextBlock Text="{Binding ImoNumber}"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="Type:" FontWeight="SemiBold" Margin="0,0,5,0"/>
+                <TextBlock Text="{Binding Type}"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="Tonnage:" FontWeight="SemiBold" Margin="0,0,5,0"/>
+                <TextBlock Text="{Binding Tonnage, StringFormat={}{0:N2}}"/>
+            </StackPanel>
+        </StackPanel>
+
+        <GroupBox Grid.Row="1" Header="Owners" Margin="0,10,0,0" DataContext="{Binding ShipDetails}" Visibility="{Binding IsLoading, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}">
+            <ListView ItemsSource="{Binding Owners}" BorderThickness="0">
+                <ListView.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding Name}"/>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
+        </GroupBox>
+
+        <Button Grid.Row="2" Content="_Close" Command="{Binding CloseCommand}" IsCancel="True" HorizontalAlignment="Right" Margin="0,15,0,5" MinWidth="75"/>
+
+        <StatusBar Grid.Row="3">
+            <StatusBarItem>
+                <TextBlock Text="{Binding StatusMessage}" />
+            </StatusBarItem>
+        </StatusBar>
+    </Grid>
+</Window>

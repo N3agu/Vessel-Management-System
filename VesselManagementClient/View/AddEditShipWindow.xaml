@@ -1,0 +1,69 @@
+﻿<Window x:Class="VesselManagementClient.View.AddEditShipWindow"
+            xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+            xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+            xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+            xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+            xmlns:local="clr-namespace:VesselManagementClient.View"
+            xmlns:vm="clr-namespace:VesselManagementClient.ViewModel"
+            xmlns:ui="http://schemas.modernwpf.com/2019"
+            mc:Ignorable="d"
+            ui:WindowHelper.UseModernWindowStyle="True"
+            Title="{Binding WindowTitle}" Height="550" Width="450"
+            WindowStartupLocation="CenterOwner" ResizeMode="NoResize" ShowInTaskbar="False"
+            d:DataContext="{d:DesignInstance Type=vm:AddEditShipViewModel, IsDesignTimeCreatable=True}">
+
+    <Grid Margin="15">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <Label Grid.Row="0" Grid.Column="0" Content="_Name:" Target="{Binding ElementName=txtName}" VerticalAlignment="Center"/>
+        <TextBox Grid.Row="0" Grid.Column="1" x:Name="txtName" Text="{Binding ShipName, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}" Margin="5"/>
+
+        <Label Grid.Row="1" Grid.Column="0" Content="_IMO (7 digits):" Target="{Binding ElementName=txtImo}" VerticalAlignment="Center"/>
+        <TextBox Grid.Row="1" Grid.Column="1" x:Name="txtImo" Text="{Binding ImoNumber, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}" Margin="5" MaxLength="7"/>
+
+        <Label Grid.Row="2" Grid.Column="0" Content="_Type:" Target="{Binding ElementName=txtType}" VerticalAlignment="Center"/>
+        <TextBox Grid.Row="2" Grid.Column="1" x:Name="txtType" Text="{Binding ShipType, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}" Margin="5"/>
+
+        <Label Grid.Row="3" Grid.Column="0" Content="T_onnage:" Target="{Binding ElementName=txtTonnage}" VerticalAlignment="Center"/>
+        <TextBox Grid.Row="3" Grid.Column="1" x:Name="txtTonnage" Text="{Binding Tonnage, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}" Margin="5"/>
+
+        <Label Grid.Row="4" Grid.Column="0" Content="Owners:" VerticalAlignment="Top" Margin="0,8,0,0"
+                   Visibility="{Binding IsEditMode, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}"/>
+        <ListView Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="2" Margin="5" MaxHeight="150"
+                      ItemsSource="{Binding AvailableOwners}"
+                      Visibility="{Binding IsEditMode, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}"
+                      IsEnabled="{Binding IsLoading, Converter={StaticResource BooleanNegationConverter}}">
+            <ListView.ItemTemplate>
+                <DataTemplate>
+                    <CheckBox IsChecked="{Binding IsSelected}" Content="{Binding Owner.Name}"/>
+                </DataTemplate>
+            </ListView.ItemTemplate>
+        </ListView>
+
+        <StackPanel Grid.Row="6" Grid.Column="0" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,15,0,5">
+            <ui:ProgressRing IsActive="{Binding IsLoading}" Height="20" Width="20" Margin="0,0,10,0" VerticalAlignment="Center"/>
+            <Button Content="_Save" Command="{Binding SaveCommand}" IsDefault="True" Style="{StaticResource AccentButtonStyle}" MinWidth="75" Margin="0,0,10,0"/>
+            <Button Content="_Cancel" Command="{Binding CancelCommand}" IsCancel="True" MinWidth="75"/>
+        </StackPanel>
+
+        <StatusBar Grid.Row="7" Grid.Column="0" Grid.ColumnSpan="2">
+            <StatusBarItem>
+                <TextBlock Text="{Binding StatusMessage}" />
+            </StatusBarItem>
+        </StatusBar>
+
+    </Grid>
+</Window>
