@@ -21,7 +21,6 @@ namespace VesselManagementApi.DTOs
         [Range(0.01, double.MaxValue, ErrorMessage = "Tonnage must be greater than 0.")]
         public decimal Tonnage { get; set; }
 
-        // List of Owner IDs to associate with the new ship
         [Required]
         [MinLength(1, ErrorMessage = "At least one owner ID must be provided.")]
         public List<int> OwnerIds { get; set; } = new List<int>();
