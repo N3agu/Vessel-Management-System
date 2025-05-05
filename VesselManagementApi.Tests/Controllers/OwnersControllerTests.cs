@@ -20,10 +20,9 @@ namespace VesselManagementApi.Tests.Controllers
             _client = factory.CreateClient();
         }
 
-        private VesselManagementDbContext GetDbContext() // Made synchronous for simplicity in verification steps
+        private VesselManagementDbContext GetDbContext()
         {
             var scopeFactory = _factory.Services.GetRequiredService<IServiceScopeFactory>();
-            // Create a new scope for each context instance in tests
             var scope = scopeFactory.CreateScope();
             return scope.ServiceProvider.GetRequiredService<VesselManagementDbContext>();
         }
@@ -36,11 +35,11 @@ namespace VesselManagementApi.Tests.Controllers
             var response = await _client.GetAsync("/api/owners");
 
             // Assert
-            response.EnsureSuccessStatusCode(); // Throw on error code
+            response.EnsureSuccessStatusCode();
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
             var owners = await response.Content.ReadFromJsonAsync<List<OwnerDto>>();
             Assert.NotNull(owners);
-            Assert.True(owners.Count >= 2); // Based on seeded data
+            Assert.True(owners.Count >= 2);
             Assert.Contains(owners, o => o.Name == "Test Owner 1");
             Assert.Contains(owners, o => o.Name == "Test Owner 2");
         }
@@ -128,13 +127,12 @@ namespace VesselManagementApi.Tests.Controllers
         [Fact]
         public async Task DeleteOwner_ExistingId_ReturnsNoContentAndRemovesOwnerAndLinks()
         {
-            // Arrange: Create a dedicated owner and ship to delete for this test
+            // Arrange
             var ownerNameToDelete = $"OwnerToDelete {Guid.NewGuid()}";
             var shipNameToDelete = $"ShipOwnedByDeletedOwner {Guid.NewGuid()}";
             int ownerIdToDelete;
             int shipIdOwned;
 
-            // Use a separate context scope for setup
             using (var setupScope = _factory.Services.CreateScope())
             {
                 var setupContext = setupScope.ServiceProvider.GetRequiredService<VesselManagementDbContext>();
@@ -156,7 +154,6 @@ namespace VesselManagementApi.Tests.Controllers
                 setupContext.ShipOwners.Add(new ShipOwner { OwnerId = ownerIdToDelete, ShipId = shipIdOwned });
                 await setupContext.SaveChangesAsync();
             }
-
 
             // Act
             var response = await _client.DeleteAsync($"/api/owners/{ownerIdToDelete}");

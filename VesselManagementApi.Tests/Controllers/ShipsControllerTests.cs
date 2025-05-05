@@ -13,7 +13,6 @@ namespace VesselManagementApi.Tests.Controllers
     {
         private readonly HttpClient _client;
         private readonly CustomWebApplicationFactory<Program> _factory;
-        // Remove _resetDatabase delegate
 
         public ShipsControllerTests(CustomWebApplicationFactory<Program> factory)
         {
@@ -35,7 +34,6 @@ namespace VesselManagementApi.Tests.Controllers
             string potentialImo = new string(combined.Where(char.IsDigit).Reverse().Take(7).Reverse().ToArray());
             return potentialImo.PadLeft(7, '0');
         }
-
 
         [Fact]
         public async Task GetShips_ReturnsOkAndListOfShips()

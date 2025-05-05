@@ -83,7 +83,6 @@ namespace VesselManagementApi.Tests
                 new ShipOwner { OwnerId = owner1.Id, ShipId = ship1.Id },
                 new ShipOwner { OwnerId = owner2.Id, ShipId = ship1.Id }, // Ship 1 owned by Owner 1 & 2
                 new ShipOwner { OwnerId = owner2.Id, ShipId = ship2.Id }  // Ship 2 owned by Owner 2
-                                                                          // Note: shipForDeleteTest initially has no owners
             );
             context.SaveChanges();
             Console.WriteLine("Initial data seeded.");

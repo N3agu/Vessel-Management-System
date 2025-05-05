@@ -4,6 +4,7 @@ using VesselManagementApi.Interfaces;
 using VesselManagementApi.Services;
 using VesselManagementApi.Mapping;
 using Microsoft.OpenApi.Models;
+using System.Reflection;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -52,6 +53,18 @@ builder.Services.AddSwaggerGen(options =>
             Name = "Neagu Andrei"
         }
     });
+
+    var xmlFilename = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFilename);
+    if (File.Exists(xmlPath))
+    {
+        Console.WriteLine($"Including XML comments from: {xmlPath}");
+        options.IncludeXmlComments(xmlPath);
+    }
+    else
+    {
+        Console.WriteLine($"Warning: XML comment file not found at: {xmlPath}");
+    }
 });
 
 // Build the app
@@ -80,7 +93,6 @@ if (app.Environment.IsDevelopment())
             Console.WriteLine($"Error applying migrations: {ex.Message}");
         }
     }
-
 }
 
 // Redirect HTTP requests to HTTPS
