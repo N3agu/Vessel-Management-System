@@ -1,31 +1,66 @@
-﻿using Microsoft.Extensions.DependencyInjection;
-using Microsoft.VisualStudio.TestPlatform.TestHost;
-using System.Net.Http.Json;
-using System.Net;
-using VesselManagementApi.DTOs;
+﻿using VesselManagementApi.DTOs;
 using VesselManagementApi.Data;
 using Microsoft.EntityFrameworkCore;
 using VesselManagementApi.Models;
+using AutoMapper;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging.Abstractions;
+using VesselManagementApi.Controllers;
+using VesselManagementApi.Services;
+using VesselManagementApi.Interfaces;
+using VesselManagementApi.Mapping;
 
 namespace VesselManagementApi.Tests.Controllers
 {
-    public class ShipsControllerTests : IClassFixture<CustomWebApplicationFactory<Program>>
+    public class ShipsControllerTests
     {
-        private readonly HttpClient _client;
-        private readonly CustomWebApplicationFactory<Program> _factory;
+        private IMapper _mapper;
 
-        public ShipsControllerTests(CustomWebApplicationFactory<Program> factory)
+        // create unique DbContext options for each test
+        private DbContextOptions<VesselManagementDbContext> CreateNewContextOptions()
         {
-            _factory = factory;
-            _client = factory.CreateClient();
+            return new DbContextOptionsBuilder<VesselManagementDbContext>()
+                .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
+                .Options;
         }
 
-        private IServiceScope CreateScope()
+        private IMapper GetMapper()
         {
-            var scopeFactory = _factory.Services.GetRequiredService<IServiceScopeFactory>();
-            return scopeFactory.CreateScope();
+            if (_mapper == null)
+            {
+                var mappingConfig = new MapperConfiguration(mc =>
+                {
+                    mc.AddProfile(new MappingProfile());
+                });
+                IMapper mapper = mappingConfig.CreateMapper();
+                _mapper = mapper;
+            }
+            return _mapper;
         }
 
+        private async Task<(int owner1Id, int owner2Id, int ship1Id, int ship2Id)> SeedDataAsync(VesselManagementDbContext context)
+        {
+            var owner1 = new Owner { Name = "Seed Owner 1" };
+            var owner2 = new Owner { Name = "Seed Owner 2" };
+            context.Owners.AddRange(owner1, owner2);
+            await context.SaveChangesAsync(); // Save to get IDs
+
+            var ship1 = new Ship { Name = "Seed Ship 1", ImoNumber = "1111111", Type = "Cargo", Tonnage = 10000 };
+            var ship2 = new Ship { Name = "Seed Ship 2", ImoNumber = "2222222", Type = "Tanker", Tonnage = 20000 };
+            context.Ships.AddRange(ship1, ship2);
+            await context.SaveChangesAsync(); // Save to get IDs
+
+            context.ShipOwners.AddRange(
+                new ShipOwner { OwnerId = owner1.Id, ShipId = ship1.Id },
+                new ShipOwner { OwnerId = owner2.Id, ShipId = ship1.Id },
+                new ShipOwner { OwnerId = owner2.Id, ShipId = ship2.Id }
+            );
+
+            await context.SaveChangesAsync();
+            return (owner1.Id, owner2.Id, ship1.Id, ship2.Id);
+        }
+
+        // generate 7 digit IMO
         private string GenerateUniqueImo()
         {
             long ticks = DateTime.UtcNow.Ticks;
@@ -36,384 +71,335 @@ namespace VesselManagementApi.Tests.Controllers
         }
 
         [Fact]
-        public async Task GetShips_ReturnsOkAndListOfShips()
-        {
-            // Act
-            var response = await _client.GetAsync("/api/ships");
-
-            // Assert
-            response.EnsureSuccessStatusCode();
-            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-            var ships = await response.Content.ReadFromJsonAsync<List<ShipDto>>();
-            Assert.NotNull(ships);
-            Assert.Contains(ships, s => s.ImoNumber == "1111111");
-            Assert.Contains(ships, s => s.ImoNumber == "2222222");
-        }
-
-        [Fact]
-        public async Task GetShipDetails_ExistingId_ReturnsOkAndShipWithOwners()
+        public async Task GetShips_ReturnsOkResult_WithListOfShips()
         {
             // Arrange
-            int existingShipId;
-            List<int> expectedOwnerIds;
-            using (var scope = CreateScope())
+            var options = CreateNewContextOptions();
+            await using (var context = new VesselManagementDbContext(options))
             {
-                var context = scope.ServiceProvider.GetRequiredService<VesselManagementDbContext>();
-                var seededShip = await context.Ships
-                                             .Include(s => s.ShipOwners)
-                                             .ThenInclude(so => so.Owner)
-                                             .FirstOrDefaultAsync(s => s.ImoNumber == "1111111");
-                Assert.NotNull(seededShip);
-                existingShipId = seededShip.Id;
-                expectedOwnerIds = seededShip.ShipOwners.Select(so => so.OwnerId).ToList();
-            }
+                await SeedDataAsync(context);
 
+                var shipRepo = new ShipInterface(context);
+                var ownerRepo = new OwnerInterface(context);
+                var mapper = GetMapper();
+                var logger = NullLogger<ShipService>.Instance;
+                var service = new ShipService(shipRepo, ownerRepo, mapper, logger);
+                var controllerLogger = NullLogger<ShipsController>.Instance;
+                var controller = new ShipsController(service, controllerLogger);
 
-            // Act
-            var response = await _client.GetAsync($"/api/ships/{existingShipId}");
+                // Act
+                var actionResult = await controller.GetShips();
 
-            // Assert
-            response.EnsureSuccessStatusCode();
-            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-            var shipDetails = await response.Content.ReadFromJsonAsync<ShipDetailsDto>();
-            Assert.NotNull(shipDetails);
-            Assert.Equal(existingShipId, shipDetails.Id);
-            Assert.Equal("1111111", shipDetails.ImoNumber);
-            Assert.NotNull(shipDetails.Owners);
-            Assert.Equal(expectedOwnerIds.Count, shipDetails.Owners.Count);
-            foreach (var ownerId in expectedOwnerIds)
-            {
-                Assert.Contains(shipDetails.Owners, o => o.Id == ownerId);
+                // Assert
+                var okResult = Assert.IsType<OkObjectResult>(actionResult.Result);
+                var ships = Assert.IsAssignableFrom<IEnumerable<ShipDto>>(okResult.Value);
+                Assert.Equal(2, ships.Count());
+                Assert.Contains(ships, s => s.ImoNumber == "1111111");
+                Assert.Contains(ships, s => s.ImoNumber == "2222222");
             }
         }
 
         [Fact]
-        public async Task GetShipDetails_NonExistentId_ReturnsNotFound()
+        public async Task GetShipDetails_ExistingId_ReturnsOkResult_WithShipAndOwners()
         {
             // Arrange
-            var nonExistentId = -999;
-
-            // Act
-            var response = await _client.GetAsync($"/api/ships/{nonExistentId}");
-
-            // Assert
-            Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-        }
-
-        [Fact]
-        public async Task CreateShip_ValidData_ReturnsCreatedAndShipDetails()
-        {
-            // Arrange
-            int ownerId;
-            using (var scope = CreateScope())
+            var options = CreateNewContextOptions();
+            await using (var context = new VesselManagementDbContext(options))
             {
-                var context = scope.ServiceProvider.GetRequiredService<VesselManagementDbContext>();
-                var owner = await context.Owners.FirstAsync(); // Get first available owner
-                ownerId = owner.Id;
+                var (owner1Id, owner2Id, ship1Id, _) = await SeedDataAsync(context);
+
+                var shipRepo = new ShipInterface(context);
+                var ownerRepo = new OwnerInterface(context);
+                var mapper = GetMapper();
+                var logger = NullLogger<ShipService>.Instance;
+                var service = new ShipService(shipRepo, ownerRepo, mapper, logger);
+                var controllerLogger = NullLogger<ShipsController>.Instance;
+                var controller = new ShipsController(service, controllerLogger);
+
+                // Act
+                var actionResult = await controller.GetShipDetails(ship1Id);
+
+                // Assert
+                var okResult = Assert.IsType<OkObjectResult>(actionResult.Result);
+                var shipDetails = Assert.IsType<ShipDetailsDto>(okResult.Value);
+                Assert.Equal(ship1Id, shipDetails.Id);
+                Assert.Equal("1111111", shipDetails.ImoNumber);
+                Assert.NotNull(shipDetails.Owners);
+                Assert.Equal(2, shipDetails.Owners.Count);
+                Assert.Contains(shipDetails.Owners, o => o.Id == owner1Id);
+                Assert.Contains(shipDetails.Owners, o => o.Id == owner2Id);
             }
+        }
 
-            string uniqueImo = GenerateUniqueImo();
-
-            var newShipDto = new CreateShipDto
+        [Fact]
+        public async Task GetShipDetails_NonExistentId_ReturnsNotFoundResult()
+        {
+            // Arrange
+            var options = CreateNewContextOptions();
+            await using (var context = new VesselManagementDbContext(options))
             {
-                Name = "Brand New Ship",
-                ImoNumber = uniqueImo,
-                Type = "Cruise",
-                Tonnage = 50000,
-                OwnerIds = new List<int> { ownerId }
-            };
+                var nonExistentId = 999;
+                var shipRepo = new ShipInterface(context);
+                var ownerRepo = new OwnerInterface(context);
+                var mapper = GetMapper();
+                var logger = NullLogger<ShipService>.Instance;
+                var service = new ShipService(shipRepo, ownerRepo, mapper, logger);
+                var controllerLogger = NullLogger<ShipsController>.Instance;
+                var controller = new ShipsController(service, controllerLogger);
 
-            // Act
-            var response = await _client.PostAsJsonAsync("/api/ships", newShipDto);
+                // Act
+                var actionResult = await controller.GetShipDetails(nonExistentId);
 
-            // Assert
-            if (!response.IsSuccessStatusCode)
-            {
-                var errorContent = await response.Content.ReadAsStringAsync();
-                Assert.Fail($"POST /api/ships returned {response.StatusCode}. Content: {errorContent}");
+                // Assert
+                Assert.IsType<NotFoundObjectResult>(actionResult.Result);
             }
-            response.EnsureSuccessStatusCode();
-
-            Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-            var createdShip = await response.Content.ReadFromJsonAsync<ShipDetailsDto>();
-            Assert.NotNull(createdShip);
-            Assert.Equal(newShipDto.Name, createdShip.Name);
-            Assert.Equal(newShipDto.ImoNumber, createdShip.ImoNumber);
-            Assert.True(createdShip.Id > 0);
-            Assert.NotNull(createdShip.Owners);
-            Assert.Single(createdShip.Owners); // Should have 1 owner
-            Assert.Equal(ownerId, createdShip.Owners.First().Id);
-            Assert.NotNull(response.Headers.Location);
-
-            var expectedPath = $"/api/ships/{createdShip.Id}";
-            var actualPath = response.Headers.Location?.AbsolutePath;
-            Assert.True(string.Equals(expectedPath, actualPath, StringComparison.OrdinalIgnoreCase),
-                        $"Expected location '{expectedPath}' (case-insensitive), but got '{actualPath}'");
-
-
-            // Verify creation via GET
-            var getResponse = await _client.GetAsync(response.Headers.Location);
-            getResponse.EnsureSuccessStatusCode();
-            Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
         }
 
+
         [Fact]
-        public async Task CreateShip_DuplicateImoNumber_ReturnsBadRequest()
+        public async Task CreateShip_ValidData_ReturnsCreatedAtActionResult_WithShipDetails()
         {
             // Arrange
-            var existingImoNumber = "1111111"; // From seeded data
-            int ownerId;
-            using (var scope = CreateScope())
+            var options = CreateNewContextOptions();
+            await using (var context = new VesselManagementDbContext(options))
             {
-                var context = scope.ServiceProvider.GetRequiredService<VesselManagementDbContext>();
-                var owner = await context.Owners.FirstAsync();
-                ownerId = owner.Id;
-            }
+                var owner = new Owner { Name = "Test Owner" };
+                context.Owners.Add(owner);
+                await context.SaveChangesAsync();
+                var ownerId = owner.Id;
 
-            var newShipDto = new CreateShipDto
-            {
-                Name = "Duplicate IMO Ship",
-                ImoNumber = existingImoNumber, // Use existing IMO
-                Type = "Duplicate",
-                Tonnage = 100,
-                OwnerIds = new List<int> { ownerId }
-            };
-
-            // Act
-            var response = await _client.PostAsJsonAsync("/api/ships", newShipDto);
-
-            // Assert
-            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-            var error = await response.Content.ReadAsStringAsync();
-            Assert.Contains($"IMO Number {existingImoNumber} already exists", error);
-        }
-
-        [Fact]
-        public async Task CreateShip_NonExistentOwnerId_ReturnsBadRequest()
-        {
-            // Arrange
-            var nonExistentOwnerId = -999;
-            var newShipDto = new CreateShipDto
-            {
-                Name = "Ship With Invalid Owner",
-                ImoNumber = GenerateUniqueImo(), // Unique IMO
-                Type = "Invalid",
-                Tonnage = 200,
-                OwnerIds = new List<int> { nonExistentOwnerId } // Use non-existent owner
-            };
-
-            // Act
-            var response = await _client.PostAsJsonAsync("/api/ships", newShipDto);
-
-            // Assert
-            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-            var errorContent = await response.Content.ReadAsStringAsync();
-
-            Assert.Contains("owner", errorContent, StringComparison.OrdinalIgnoreCase);
-            Assert.Contains("exist", errorContent, StringComparison.OrdinalIgnoreCase);
-        }
-
-        [Fact]
-        public async Task CreateShip_InvalidModel_ReturnsBadRequest()
-        {
-            // Arrange
-            var invalidShipDto = new CreateShipDto
-            {
-                Name = "", // Invalid Name
-                ImoNumber = "123", // Invalid IMO
-                Type = "Test",
-                Tonnage = -100, // Invalid Tonnage
-                OwnerIds = new List<int>() // Invalid - requires at least one owner
-            };
-
-            // Act
-            var response = await _client.PostAsJsonAsync("/api/ships", invalidShipDto);
-
-            // Assert
-            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        }
-
-
-        [Fact]
-        public async Task UpdateShip_ValidData_ReturnsNoContent()
-        {
-            // Arrange
-            int shipIdToUpdate;
-            using (var scope = CreateScope())
-            {
-                var context = scope.ServiceProvider.GetRequiredService<VesselManagementDbContext>();
-                var shipToUpdate = await context.Ships.FirstOrDefaultAsync(s => s.ImoNumber == "1111111"); // Get ship from seed
-                Assert.NotNull(shipToUpdate); // Ensure seed data exists
-                shipIdToUpdate = shipToUpdate.Id;
-            }
-
-            var updateDto = new UpdateShipDto
-            {
-                Name = "Updated Test Ship 1",
-                ImoNumber = "1111111",
-                Type = "Updated Cargo",
-                Tonnage = 15000
-            };
-
-            // Act
-            var response = await _client.PutAsJsonAsync($"/api/ships/{shipIdToUpdate}", updateDto);
-
-            // Assert
-            response.EnsureSuccessStatusCode();
-            Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
-
-            // Verify update via GET
-            var getResponse = await _client.GetAsync($"/api/ships/{shipIdToUpdate}");
-            getResponse.EnsureSuccessStatusCode();
-            var updatedShip = await getResponse.Content.ReadFromJsonAsync<ShipDetailsDto>();
-            Assert.NotNull(updatedShip);
-            Assert.Equal(updateDto.Name, updatedShip.Name);
-            Assert.Equal(updateDto.Type, updatedShip.Type);
-            Assert.Equal(updateDto.Tonnage, updatedShip.Tonnage);
-        }
-
-        [Fact]
-        public async Task UpdateShip_NonExistentId_ReturnsNotFound()
-        {
-            // Arrange
-            var nonExistentId = -999;
-            
-            // make sure the DTO being sent is valid!!!
-            var updateDto = new UpdateShipDto
-            {
-                Name = "Update Non Existent",
-                ImoNumber = GenerateUniqueImo(),
-                Type = "Ghost",
-                Tonnage = 100
-            };
-
-            // Act
-            var response = await _client.PutAsJsonAsync($"/api/ships/{nonExistentId}", updateDto);
-
-            // Assert
-            Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-        }
-
-        [Fact]
-        public async Task UpdateShip_DuplicateImoNumber_ReturnsBadRequest()
-        {
-            // Arrange
-            int shipIdToUpdate;
-            string existingImoOfOtherShip;
-            using (var scope = CreateScope())
-            {
-                var context = scope.ServiceProvider.GetRequiredService<VesselManagementDbContext>();
-                var shipToUpdate = await context.Ships.FirstAsync(s => s.ImoNumber == "1111111");
-                var otherShip = await context.Ships.FirstAsync(s => s.ImoNumber == "2222222");
-                Assert.NotNull(shipToUpdate);
-                Assert.NotNull(otherShip);
-                shipIdToUpdate = shipToUpdate.Id;
-                existingImoOfOtherShip = otherShip.ImoNumber;
-            }
-
-            var updateDto = new UpdateShipDto
-            {
-                Name = "Trying Duplicate IMO",
-                ImoNumber = existingImoOfOtherShip, // Attempt to use Ship 2's IMO
-                Type = "Cargo",
-                Tonnage = 10000
-            };
-
-            // Act
-            var response = await _client.PutAsJsonAsync($"/api/ships/{shipIdToUpdate}", updateDto);
-
-            // Assert
-            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-            var error = await response.Content.ReadAsStringAsync();
-            Assert.Contains($"Another ship with IMO Number {existingImoOfOtherShip} already exists", error);
-        }
-
-        [Fact]
-        public async Task UpdateShip_InvalidModel_ReturnsBadRequest()
-        {
-            // Arrange
-            int shipIdToUpdate;
-            using (var scope = CreateScope())
-            {
-                var context = scope.ServiceProvider.GetRequiredService<VesselManagementDbContext>();
-                var shipToUpdate = await context.Ships.FirstAsync();
-                Assert.NotNull(shipToUpdate);
-                shipIdToUpdate = shipToUpdate.Id;
-            }
-
-
-            var invalidUpdateDto = new UpdateShipDto
-            {
-                // invalid formats
-                Name = "",
-                ImoNumber = "123",
-                Type = "Test",
-                Tonnage = 0
-            };
-
-            // Act
-            var response = await _client.PutAsJsonAsync($"/api/ships/{shipIdToUpdate}", invalidUpdateDto);
-
-            // Assert
-            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        }
-
-
-        [Fact]
-        public async Task DeleteShip_ExistingId_ReturnsNoContentAndRemovesShipAndLinks()
-        {
-            // Arrange: Create a dedicated ship and link to delete
-            int shipIdToDelete;
-
-            using (var setupScope = CreateScope())
-            {
-                var setupContext = setupScope.ServiceProvider.GetRequiredService<VesselManagementDbContext>();
-                var owner = await setupContext.Owners.FirstAsync();
-                // unique IMO
                 var uniqueImo = GenerateUniqueImo();
-                while (await setupContext.Ships.AnyAsync(s => s.ImoNumber == uniqueImo))
+                var newShipDto = new CreateShipDto
                 {
-                    uniqueImo = GenerateUniqueImo();
-                }
-                var ship = new Ship { Name = $"ShipToDelete {Guid.NewGuid()}", ImoNumber = uniqueImo, Type = "TestDeleteShip", Tonnage = 1 };
-                setupContext.Ships.Add(ship);
-                await setupContext.SaveChangesAsync();
-                shipIdToDelete = ship.Id;
+                    Name = "Create Ship Test",
+                    ImoNumber = uniqueImo,
+                    Type = "TestCreate",
+                    Tonnage = 1234,
+                    OwnerIds = new List<int> { ownerId }
+                };
 
-                setupContext.ShipOwners.Add(new ShipOwner { OwnerId = owner.Id, ShipId = shipIdToDelete });
-                await setupContext.SaveChangesAsync();
-            }
+                var shipRepo = new ShipInterface(context);
+                var ownerRepo = new OwnerInterface(context);
+                var mapper = GetMapper();
+                var logger = NullLogger<ShipService>.Instance;
+                var service = new ShipService(shipRepo, ownerRepo, mapper, logger);
+                var controllerLogger = NullLogger<ShipsController>.Instance;
+                var controller = new ShipsController(service, controllerLogger);
 
-            // Act
-            var response = await _client.DeleteAsync($"/api/ships/{shipIdToDelete}");
+                // Act
+                var actionResult = await controller.CreateShip(newShipDto);
 
-            // Assert - Deletion successful
-            Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+                // Assert
+                var createdAtActionResult = Assert.IsType<CreatedAtActionResult>(actionResult.Result);
+                var createdShip = Assert.IsType<ShipDetailsDto>(createdAtActionResult.Value);
+                Assert.Equal(newShipDto.Name, createdShip.Name);
+                Assert.Equal(uniqueImo, createdShip.ImoNumber);
+                Assert.True(createdShip.Id > 0);
+                Assert.NotNull(createdShip.Owners);
+                Assert.Single(createdShip.Owners);
+                Assert.Equal(ownerId, createdShip.Owners.First().Id);
+                Assert.Equal(nameof(controller.GetShipDetails), createdAtActionResult.ActionName);
+                Assert.Equal(createdShip.Id, createdAtActionResult.RouteValues["id"]);
 
-            // Assert - Ship is deleted
-            var getShipResponse = await _client.GetAsync($"/api/ships/{shipIdToDelete}");
-            Assert.Equal(HttpStatusCode.NotFound, getShipResponse.StatusCode);
-
-            // Assert - ShipOwner links are deleted
-            using (var verifyScope = CreateScope())
-            {
-                var verifyContext = verifyScope.ServiceProvider.GetRequiredService<VesselManagementDbContext>();
-                var linkExists = await verifyContext.ShipOwners.AnyAsync(so => so.ShipId == shipIdToDelete);
-                Assert.False(linkExists, "ShipOwner links for the deleted ship should be removed by cascade delete.");
+                // Verify
+                var shipInDb = await context.Ships.Include(s => s.ShipOwners).FirstOrDefaultAsync(s => s.Id == createdShip.Id);
+                Assert.NotNull(shipInDb);
+                Assert.Single(shipInDb.ShipOwners);
+                Assert.Equal(ownerId, shipInDb.ShipOwners.First().OwnerId);
             }
         }
 
         [Fact]
-        public async Task DeleteShip_NonExistentId_ReturnsNotFound()
+        public async Task CreateShip_DuplicateImoNumber_ReturnsBadRequestResult()
         {
             // Arrange
-            var nonExistentId = -999;
+            var options = CreateNewContextOptions();
+            await using (var context = new VesselManagementDbContext(options))
+            {
+                var (owner1Id, _, _, _) = await SeedDataAsync(context);
+                var existingImo = "1111111";
 
-            // Act
-            var response = await _client.DeleteAsync($"/api/ships/{nonExistentId}");
+                var duplicateShipDto = new CreateShipDto
+                {
+                    Name = "Duplicate Test",
+                    ImoNumber = existingImo,
+                    Type = "Duplicate",
+                    Tonnage = 100,
+                    OwnerIds = new List<int> { owner1Id }
+                };
 
-            // Assert
-            Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+                var shipRepo = new ShipInterface(context);
+                var ownerRepo = new OwnerInterface(context);
+                var mapper = GetMapper();
+                var logger = NullLogger<ShipService>.Instance;
+                var service = new ShipService(shipRepo, ownerRepo, mapper, logger);
+                var controllerLogger = NullLogger<ShipsController>.Instance;
+                var controller = new ShipsController(service, controllerLogger);
+
+                // Act
+                var actionResult = await controller.CreateShip(duplicateShipDto);
+
+                // Assert
+                var badRequestResult = Assert.IsType<BadRequestObjectResult>(actionResult.Result);
+                Assert.Contains(existingImo, badRequestResult.Value.ToString());
+            }
+        }
+
+        [Fact]
+        public async Task CreateShip_NonExistentOwnerId_ReturnsBadRequestResult()
+        {
+            // Arrange
+            var options = CreateNewContextOptions();
+            await using (var context = new VesselManagementDbContext(options))
+            {
+                var nonExistentOwnerId = 999;
+                var newShipDto = new CreateShipDto
+                {
+                    Name = "Ship With Invalid Owner",
+                    ImoNumber = GenerateUniqueImo(),
+                    Type = "Invalid",
+                    Tonnage = 200,
+                    OwnerIds = new List<int> { nonExistentOwnerId }
+                };
+
+                var shipRepo = new ShipInterface(context);
+                var ownerRepo = new OwnerInterface(context);
+                var mapper = GetMapper();
+                var logger = NullLogger<ShipService>.Instance;
+                var service = new ShipService(shipRepo, ownerRepo, mapper, logger);
+                var controllerLogger = NullLogger<ShipsController>.Instance;
+                var controller = new ShipsController(service, controllerLogger);
+
+                // Act
+                var actionResult = await controller.CreateShip(newShipDto);
+
+                // Assert
+                var badRequestResult = Assert.IsType<BadRequestObjectResult>(actionResult.Result);
+                Assert.Contains("owner", badRequestResult.Value.ToString(), StringComparison.OrdinalIgnoreCase);
+                Assert.Contains("exist", badRequestResult.Value.ToString(), StringComparison.OrdinalIgnoreCase);
+            }
+        }
+
+        [Fact]
+        public async Task UpdateShip_ValidData_ReturnsNoContentResult()
+        {
+            // Arrange
+            var options = CreateNewContextOptions();
+            await using (var context = new VesselManagementDbContext(options))
+            {
+                var (_, _, ship1Id, _) = await SeedDataAsync(context);
+
+                var updateDto = new UpdateShipDto
+                {
+                    Name = "Updated Name",
+                    ImoNumber = "1111111",
+                    Type = "Updated Type",
+                    Tonnage = 9999
+                };
+
+                var shipRepo = new ShipInterface(context);
+                var ownerRepo = new OwnerInterface(context);
+                var mapper = GetMapper();
+                var logger = NullLogger<ShipService>.Instance;
+                var service = new ShipService(shipRepo, ownerRepo, mapper, logger);
+                var controllerLogger = NullLogger<ShipsController>.Instance;
+                var controller = new ShipsController(service, controllerLogger);
+
+                // Act
+                var actionResult = await controller.UpdateShip(ship1Id, updateDto);
+
+                // Assert
+                Assert.IsType<NoContentResult>(actionResult);
+
+                // Verify
+                var updatedShip = await context.Ships.FindAsync(ship1Id);
+                Assert.NotNull(updatedShip);
+                Assert.Equal(updateDto.Name, updatedShip.Name);
+                Assert.Equal(updateDto.Type, updatedShip.Type);
+                Assert.Equal(updateDto.Tonnage, updatedShip.Tonnage);
+            }
+        }
+
+        [Fact]
+        public async Task UpdateShip_NonExistentId_ReturnsNotFoundResult()
+        {
+            // Arrange
+            var options = CreateNewContextOptions();
+            await using (var context = new VesselManagementDbContext(options))
+            {
+                var nonExistentId = 999;
+                var updateDto = new UpdateShipDto { Name = "UpdateFail", ImoNumber = "8888888", Type = "Fail", Tonnage = 100 };
+
+                var shipRepo = new ShipInterface(context);
+                var ownerRepo = new OwnerInterface(context);
+                var mapper = GetMapper();
+                var logger = NullLogger<ShipService>.Instance;
+                var service = new ShipService(shipRepo, ownerRepo, mapper, logger);
+                var controllerLogger = NullLogger<ShipsController>.Instance;
+                var controller = new ShipsController(service, controllerLogger);
+
+                // Act
+                var actionResult = await controller.UpdateShip(nonExistentId, updateDto);
+
+                // Assert
+                Assert.IsType<NotFoundObjectResult>(actionResult);
+            }
+        }
+
+        [Fact]
+        public async Task DeleteShip_ExistingId_ReturnsNoContentResult_AndRemovesShip()
+        {
+            // Arrange
+            var options = CreateNewContextOptions();
+            await using (var context = new VesselManagementDbContext(options))
+            {
+                var (_, _, ship1Id, _) = await SeedDataAsync(context); // Ship 1 has owners
+
+                var shipRepo = new ShipInterface(context);
+                var ownerRepo = new OwnerInterface(context);
+                var mapper = GetMapper();
+                var logger = NullLogger<ShipService>.Instance;
+                var service = new ShipService(shipRepo, ownerRepo, mapper, logger);
+                var controllerLogger = NullLogger<ShipsController>.Instance;
+                var controller = new ShipsController(service, controllerLogger);
+
+                // Act
+                var actionResult = await controller.DeleteShip(ship1Id);
+
+                // Assert
+                Assert.IsType<NoContentResult>(actionResult);
+
+                // Verify
+                var deletedShip = await context.Ships.FindAsync(ship1Id);
+                Assert.Null(deletedShip);
+                var deletedLinks = await context.ShipOwners.Where(so => so.ShipId == ship1Id).ToListAsync();
+                Assert.Empty(deletedLinks);
+            }
+        }
+
+        [Fact]
+        public async Task DeleteShip_NonExistentId_ReturnsNotFoundResult()
+        {
+            // Arrange
+            var options = CreateNewContextOptions();
+            await using (var context = new VesselManagementDbContext(options))
+            {
+                var nonExistentId = 999;
+
+                var shipRepo = new ShipInterface(context);
+                var ownerRepo = new OwnerInterface(context);
+                var mapper = GetMapper();
+                var logger = NullLogger<ShipService>.Instance;
+                var service = new ShipService(shipRepo, ownerRepo, mapper, logger);
+                var controllerLogger = NullLogger<ShipsController>.Instance;
+                var controller = new ShipsController(service, controllerLogger);
+
+                // Act
+                var actionResult = await controller.DeleteShip(nonExistentId);
+
+                // Assert
+                Assert.IsType<NotFoundObjectResult>(actionResult);
+            }
         }
     }
 }

@@ -1,193 +1,269 @@
-﻿using Microsoft.VisualStudio.TestPlatform.TestHost;
-using System.Net.Http.Json;
-using System.Net;
-using VesselManagementApi.Data;
+﻿using VesselManagementApi.Data;
 using VesselManagementApi.DTOs;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
 using VesselManagementApi.Models;
+using AutoMapper;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging.Abstractions;
+using VesselManagementApi.Controllers;
+using VesselManagementApi.Services;
+using VesselManagementApi.Interfaces;
+using VesselManagementApi.Mapping;
 
 namespace VesselManagementApi.Tests.Controllers
 {
-    public class OwnersControllerTests : IClassFixture<CustomWebApplicationFactory<Program>>
+    public class OwnersControllerTests
     {
-        private readonly HttpClient _client;
-        private readonly CustomWebApplicationFactory<Program> _factory;
+        private IMapper _mapper;
 
-        public OwnersControllerTests(CustomWebApplicationFactory<Program> factory)
+        // create unique DbContext options for each test
+        private DbContextOptions<VesselManagementDbContext> CreateNewContextOptions()
         {
-            _factory = factory;
-            _client = factory.CreateClient();
+            return new DbContextOptionsBuilder<VesselManagementDbContext>()
+                .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
+                .Options;
         }
 
-        private VesselManagementDbContext GetDbContext()
+        private IMapper GetMapper()
         {
-            var scopeFactory = _factory.Services.GetRequiredService<IServiceScopeFactory>();
-            var scope = scopeFactory.CreateScope();
-            return scope.ServiceProvider.GetRequiredService<VesselManagementDbContext>();
-        }
-
-
-        [Fact]
-        public async Task GetOwners_ReturnsOkAndListOfOwners()
-        {
-            // Act
-            var response = await _client.GetAsync("/api/owners");
-
-            // Assert
-            response.EnsureSuccessStatusCode();
-            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-            var owners = await response.Content.ReadFromJsonAsync<List<OwnerDto>>();
-            Assert.NotNull(owners);
-            Assert.True(owners.Count >= 2);
-            Assert.Contains(owners, o => o.Name == "Test Owner 1");
-            Assert.Contains(owners, o => o.Name == "Test Owner 2");
-        }
-
-        [Fact]
-        public async Task GetOwner_ExistingId_ReturnsOkAndOwner()
-        {
-            // Arrange
-            int existingOwnerId;
-            using (var context = GetDbContext())
+            if (_mapper == null)
             {
-                var seededOwner = await context.Owners.FirstOrDefaultAsync(o => o.Name == "Test Owner 1");
-                Assert.NotNull(seededOwner);
-                existingOwnerId = seededOwner.Id;
+                var mappingConfig = new MapperConfiguration(mc =>
+                {
+                    mc.AddProfile(new MappingProfile());
+                });
+                IMapper mapper = mappingConfig.CreateMapper();
+                _mapper = mapper;
             }
+            return _mapper;
+        }
 
+        private async Task SeedDataAsync(VesselManagementDbContext context)
+        {
+            var owner1 = new Owner { Id = 1, Name = "Test Owner 1" };
+            var owner2 = new Owner { Id = 2, Name = "Test Owner 2" };
+            context.Owners.AddRange(owner1, owner2);
 
-            // Act
-            var response = await _client.GetAsync($"/api/owners/{existingOwnerId}");
+            var ship1 = new Ship { Id = 1, Name = "Test Ship 1", ImoNumber = "1111111", Type = "Cargo", Tonnage = 10000 };
+            var ship2 = new Ship { Id = 2, Name = "Test Ship 2", ImoNumber = "2222222", Type = "Tanker", Tonnage = 20000 };
+            context.Ships.AddRange(ship1, ship2);
 
-            // Assert
-            response.EnsureSuccessStatusCode();
-            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-            var owner = await response.Content.ReadFromJsonAsync<OwnerDto>();
-            Assert.NotNull(owner);
-            Assert.Equal(existingOwnerId, owner.Id);
-            Assert.Equal("Test Owner 1", owner.Name);
+            context.ShipOwners.AddRange(
+                new ShipOwner { OwnerId = 1, ShipId = 1 },
+                new ShipOwner { OwnerId = 2, ShipId = 1 },
+                new ShipOwner { OwnerId = 2, ShipId = 2 }
+            );
+
+            await context.SaveChangesAsync();
         }
 
         [Fact]
-        public async Task GetOwner_NonExistentId_ReturnsNotFound()
+        public async Task GetOwners_ReturnsOkResult_WithListOfOwners()
         {
             // Arrange
-            var nonExistentId = -999;
+            var options = CreateNewContextOptions();
+            await using (var context = new VesselManagementDbContext(options))
+            {
+                await SeedDataAsync(context);
 
-            // Act
-            var response = await _client.GetAsync($"/api/owners/{nonExistentId}");
+                var Interface = new OwnerInterface(context);
+                var mapper = GetMapper();
+                var logger = NullLogger<OwnerService>.Instance;
+                var service = new OwnerService(Interface, mapper, logger);
+                var controllerLogger = NullLogger<OwnersController>.Instance;
+                var controller = new OwnersController(service, controllerLogger);
 
-            // Assert
-            Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+                // Act
+                var actionResult = await controller.GetOwners();
+
+                // Assert
+                var okResult = Assert.IsType<OkObjectResult>(actionResult.Result);
+                var owners = Assert.IsAssignableFrom<IEnumerable<OwnerDto>>(okResult.Value);
+                Assert.Equal(2, owners.Count());
+                Assert.Contains(owners, o => o.Name == "Test Owner 1");
+                Assert.Contains(owners, o => o.Name == "Test Owner 2");
+            }
         }
 
         [Fact]
-        public async Task CreateOwner_ValidData_ReturnsCreatedAndOwner()
+        public async Task GetOwner_ExistingId_ReturnsOkResult_WithOwner()
         {
             // Arrange
-            var newOwnerDto = new CreateOwnerDto { Name = $"New Test Owner {Guid.NewGuid()}" }; // Unique name
+            var options = CreateNewContextOptions();
+            await using (var context = new VesselManagementDbContext(options))
+            {
+                await SeedDataAsync(context);
+                var existingOwnerId = 1;
 
-            // Act
-            var response = await _client.PostAsJsonAsync("/api/owners", newOwnerDto);
+                var Interface = new OwnerInterface(context);
+                var mapper = GetMapper();
+                var logger = NullLogger<OwnerService>.Instance;
+                var service = new OwnerService(Interface, mapper, logger);
+                var controllerLogger = NullLogger<OwnersController>.Instance;
+                var controller = new OwnersController(service, controllerLogger);
 
-            // Assert
-            response.EnsureSuccessStatusCode();
-            Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-            var createdOwner = await response.Content.ReadFromJsonAsync<OwnerDto>();
-            Assert.NotNull(createdOwner);
-            Assert.Equal(newOwnerDto.Name, createdOwner.Name);
-            Assert.True(createdOwner.Id > 0);
-            Assert.NotNull(response.Headers.Location);
+                // Act
+                var actionResult = await controller.GetOwner(existingOwnerId);
 
-            var expectedPath = $"/api/owners/{createdOwner.Id}"; // Assuming lowercase 'owners'
-            var actualPath = response.Headers.Location?.AbsolutePath;
-            Assert.True(string.Equals(expectedPath, actualPath, StringComparison.OrdinalIgnoreCase),
-                        $"Expected location '{expectedPath}' (case-insensitive), but got '{actualPath}'");
-
-            // Verify creation via GET
-            var getResponse = await _client.GetAsync(response.Headers.Location);
-            getResponse.EnsureSuccessStatusCode();
-            Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
+                // Assert
+                var okResult = Assert.IsType<OkObjectResult>(actionResult.Result);
+                var owner = Assert.IsType<OwnerDto>(okResult.Value);
+                Assert.Equal(existingOwnerId, owner.Id);
+                Assert.Equal("Test Owner 1", owner.Name);
+            }
         }
 
         [Fact]
-        public async Task CreateOwner_InvalidData_ReturnsBadRequest()
+        public async Task GetOwner_NonExistentId_ReturnsNotFoundResult()
         {
             // Arrange
-            var invalidOwnerDto = new CreateOwnerDto { Name = "" }; // Invalid name
+            var options = CreateNewContextOptions();
+            await using (var context = new VesselManagementDbContext(options))
+            {
+                var nonExistentId = 999;
 
-            // Act
-            var response = await _client.PostAsJsonAsync("/api/owners", invalidOwnerDto);
+                var Interface = new OwnerInterface(context);
+                var mapper = GetMapper();
+                var logger = NullLogger<OwnerService>.Instance;
+                var service = new OwnerService(Interface, mapper, logger);
+                var controllerLogger = NullLogger<OwnersController>.Instance;
+                var controller = new OwnersController(service, controllerLogger);
 
-            // Assert
-            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+                // Act
+                var actionResult = await controller.GetOwner(nonExistentId);
+
+                // Assert
+                Assert.IsType<NotFoundObjectResult>(actionResult.Result);
+            }
         }
 
         [Fact]
-        public async Task DeleteOwner_ExistingId_ReturnsNoContentAndRemovesOwnerAndLinks()
+        public async Task CreateOwner_ValidData_ReturnsCreatedAtActionResult_WithCreatedOwner()
         {
             // Arrange
-            var ownerNameToDelete = $"OwnerToDelete {Guid.NewGuid()}";
-            var shipNameToDelete = $"ShipOwnedByDeletedOwner {Guid.NewGuid()}";
+            var options = CreateNewContextOptions();
+            await using (var context = new VesselManagementDbContext(options))
+            {
+                var newOwnerDto = new CreateOwnerDto { Name = "New Create Owner" };
+
+                var Interface = new OwnerInterface(context);
+                var mapper = GetMapper();
+                var logger = NullLogger<OwnerService>.Instance;
+                var service = new OwnerService(Interface, mapper, logger);
+                var controllerLogger = NullLogger<OwnersController>.Instance;
+                var controller = new OwnersController(service, controllerLogger);
+
+                // Act
+                var actionResult = await controller.CreateOwner(newOwnerDto);
+
+                // Assert
+                var createdAtActionResult = Assert.IsType<CreatedAtActionResult>(actionResult.Result);
+                var createdOwner = Assert.IsType<OwnerDto>(createdAtActionResult.Value);
+                Assert.Equal(newOwnerDto.Name, createdOwner.Name);
+                Assert.True(createdOwner.Id > 0); // InMemory DB assigns IDs
+                Assert.Equal(nameof(controller.GetOwner), createdAtActionResult.ActionName);
+                Assert.Equal(createdOwner.Id, createdAtActionResult.RouteValues["id"]);
+
+                // Verify it was actually added to the context
+                var ownerInDb = await context.Owners.FindAsync(createdOwner.Id);
+                Assert.NotNull(ownerInDb);
+                Assert.Equal(newOwnerDto.Name, ownerInDb.Name);
+            }
+        }
+
+        [Fact]
+        public async Task CreateOwner_InvalidData_ReturnsBadRequestResult()
+        {
+            // Arrange
+            var options = CreateNewContextOptions();
+            await using (var context = new VesselManagementDbContext(options))
+            {
+                var invalidOwnerDto = new CreateOwnerDto { Name = "" };
+
+                var Interface = new OwnerInterface(context);
+                var mapper = GetMapper();
+                var logger = NullLogger<OwnerService>.Instance;
+                var service = new OwnerService(Interface, mapper, logger);
+                var controllerLogger = NullLogger<OwnersController>.Instance;
+                var controller = new OwnersController(service, controllerLogger);
+                controller.ModelState.AddModelError("Name", "The Name field is required.");
+
+                // Act
+                var actionResult = await controller.CreateOwner(invalidOwnerDto);
+
+                // Assert
+                Assert.IsType<BadRequestObjectResult>(actionResult.Result);
+            }
+        }
+
+
+        [Fact]
+        public async Task DeleteOwner_ExistingId_ReturnsNoContentResult_AndRemovesOwner()
+        {
+            // Arrange
+            var options = CreateNewContextOptions();
             int ownerIdToDelete;
             int shipIdOwned;
-
-            using (var setupScope = _factory.Services.CreateScope())
+            await using (var context = new VesselManagementDbContext(options))
             {
-                var setupContext = setupScope.ServiceProvider.GetRequiredService<VesselManagementDbContext>();
-                var owner = new Owner { Name = ownerNameToDelete };
-                setupContext.Owners.Add(owner);
-                await setupContext.SaveChangesAsync();
+                var owner = new Owner { Name = "OwnerToDelete" };
+                context.Owners.Add(owner);
+                await context.SaveChangesAsync();
                 ownerIdToDelete = owner.Id;
 
-                var uniqueImo = Guid.NewGuid().ToString().Substring(0, 7);
-                while (await setupContext.Ships.AnyAsync(s => s.ImoNumber == uniqueImo))
-                {
-                    uniqueImo = Guid.NewGuid().ToString().Substring(0, 7);
-                }
-                var ship = new Ship { Name = shipNameToDelete, ImoNumber = uniqueImo, Type = "TestDelete", Tonnage = 1 };
-                setupContext.Ships.Add(ship);
-                await setupContext.SaveChangesAsync();
+                var ship = new Ship { Name = "ShipOwned", ImoNumber = "3333333", Type = "Test", Tonnage = 1 };
+                context.Ships.Add(ship);
+                await context.SaveChangesAsync();
                 shipIdOwned = ship.Id;
 
-                setupContext.ShipOwners.Add(new ShipOwner { OwnerId = ownerIdToDelete, ShipId = shipIdOwned });
-                await setupContext.SaveChangesAsync();
-            }
+                context.ShipOwners.Add(new ShipOwner { OwnerId = ownerIdToDelete, ShipId = shipIdOwned });
+                await context.SaveChangesAsync();
 
-            // Act
-            var response = await _client.DeleteAsync($"/api/owners/{ownerIdToDelete}");
+                var Interface = new OwnerInterface(context);
+                var mapper = GetMapper();
+                var logger = NullLogger<OwnerService>.Instance;
+                var service = new OwnerService(Interface, mapper, logger);
+                var controllerLogger = NullLogger<OwnersController>.Instance;
+                var controller = new OwnersController(service, controllerLogger);
 
-            // Assert
-            Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+                // Act
+                var actionResult = await controller.DeleteOwner(ownerIdToDelete);
 
-            // Assert - Owner is deleted
-            var getOwnerResponse = await _client.GetAsync($"/api/owners/{ownerIdToDelete}");
-            Assert.Equal(HttpStatusCode.NotFound, getOwnerResponse.StatusCode);
+                // Assert
+                Assert.IsType<NoContentResult>(actionResult);
 
-            // Assert - ShipOwner links are deleted
-            using (var verifyScope = _factory.Services.CreateScope())
-            {
-                var verifyContext = verifyScope.ServiceProvider.GetRequiredService<VesselManagementDbContext>();
-                var linkExists = await verifyContext.ShipOwners.AnyAsync(so => so.OwnerId == ownerIdToDelete);
-                Assert.False(linkExists, "ShipOwner links for the deleted owner should be removed by cascade delete.");
-                // Check that the ship still exists
-                var shipExists = await verifyContext.Ships.AnyAsync(s => s.Id == shipIdOwned);
-                Assert.True(shipExists, "Deleting an owner should not delete their ships.");
+                // Verify deletion from context
+                var deletedOwner = await context.Owners.FindAsync(ownerIdToDelete);
+                Assert.Null(deletedOwner);
+                var deletedLink = await context.ShipOwners.FirstOrDefaultAsync(so => so.OwnerId == ownerIdToDelete);
+                Assert.Null(deletedLink); // Cascade delete should remove link
+                var existingShip = await context.Ships.FindAsync(shipIdOwned);
+                Assert.NotNull(existingShip); // Ship should remain
             }
         }
 
         [Fact]
-        public async Task DeleteOwner_NonExistentId_ReturnsNotFound()
+        public async Task DeleteOwner_NonExistentId_ReturnsNotFoundResult()
         {
             // Arrange
-            var nonExistentId = -999;
+            var options = CreateNewContextOptions();
+            await using (var context = new VesselManagementDbContext(options))
+            {
+                var nonExistentId = 999;
 
-            // Act
-            var response = await _client.DeleteAsync($"/api/owners/{nonExistentId}");
+                var Interface = new OwnerInterface(context);
+                var mapper = GetMapper();
+                var logger = NullLogger<OwnerService>.Instance;
+                var service = new OwnerService(Interface, mapper, logger);
+                var controllerLogger = NullLogger<OwnersController>.Instance;
+                var controller = new OwnersController(service, controllerLogger);
 
-            // Assert
-            Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+                // Act
+                var actionResult = await controller.DeleteOwner(nonExistentId);
+
+                // Assert
+                Assert.IsType<NotFoundObjectResult>(actionResult);
+            }
         }
     }
 }
