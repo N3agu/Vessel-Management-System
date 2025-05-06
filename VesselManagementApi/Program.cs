@@ -47,7 +47,7 @@ builder.Services.AddSwaggerGen(options =>
     {
         Version = "v1",
         Title = "Vessel Management API",
-        Description = "A RESTful Vessel Management System built with C#, ASP.NET Core, Entity Framework, and SQL Server, featuring CRUD operations and a many-to-many relationship between ship owners and vessels.",
+        Description = "A RESTful Vessel Management System built with C#, ASP.NET Core, Entity Framework, and SQL Server, featuring CRUD operations, a many-to-many relationship between ship owners and vessels, and unit tests using xUnit.",
         Contact = new OpenApiContact
         {
             Name = "Neagu Andrei"
