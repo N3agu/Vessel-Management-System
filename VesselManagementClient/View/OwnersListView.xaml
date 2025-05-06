@@ -19,7 +19,25 @@
 
         <TextBlock Grid.Row="0" Text="Owners" Style="{StaticResource TitleTextBlockStyle}" Margin="0,0,0,10"/>
 
-        <ListView Grid.Row="1" ItemsSource="{Binding Owners}" SelectedItem="{Binding SelectedOwner}" Margin="0,0,0,10" >
+        <ListView Grid.Row="1" ItemsSource="{Binding Owners}" PreviewMouseRightButtonDown="ListView_PreviewMouseRightButtonDown" SelectedItem="{Binding SelectedOwner}" Margin="0,0,0,10" >
+            <ListView.ContextMenu>
+                <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                    <MenuItem Header="Copy Cell"
+                                   Command="{Binding CopyCellCommand}"
+                                   CommandParameter="{Binding SelectedOwner}"
+                                   IsEnabled="{Binding SelectedOwner, Converter={StaticResource NullToBooleanConverter}}"/>
+                    <MenuItem Header="Copy Row"
+                                  Command="{Binding CopyRowCommand}"
+                                  CommandParameter="{Binding SelectedOwner}"
+                                  IsEnabled="{Binding SelectedOwner, Converter={StaticResource NullToBooleanConverter}}"/>
+                    <Separator/>
+                    <MenuItem Header="Create" Command="{Binding AddOwnerCommand}"/>
+                    <MenuItem Header="Delete"
+                                  Command="{Binding DeleteOwnerCommand}"
+                                  CommandParameter="{Binding SelectedOwner}"
+                                  IsEnabled="{Binding SelectedOwner, Converter={StaticResource NullToBooleanConverter}}"/>
+                </ContextMenu>
+            </ListView.ContextMenu>
             <ListView.View>
                 <GridView>
                     <GridViewColumn Header="ID" DisplayMemberBinding="{Binding Id}" Width="50"/>

@@ -19,7 +19,6 @@ namespace VesselManagementClient
                 mainViewModel.OpenShipDetailsRequested += MainViewModel_OpenShipDetailsRequested;
             }
         }
-
         private void MainViewModel_OpenAddOwnerRequested(object? sender, EventArgs e)
         {
             var apiService = new ApiService();
@@ -35,7 +34,6 @@ namespace VesselManagementClient
                 _ = mainViewModel.OwnersListVM.LoadOwnersAsync();
             }
         }
-
 
         private void MainViewModel_OpenAddEditShipRequested(object? sender, ShipDto? shipToEdit)
         {

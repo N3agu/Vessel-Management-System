@@ -1,5 +1,6 @@
 ﻿using System.Windows.Controls;
-using System.Windows.Data;
+using System.Windows.Media;
+using VesselManagementClient.Helpers;
 
 namespace VesselManagementClient.View
 {
@@ -10,17 +11,25 @@ namespace VesselManagementClient.View
             InitializeComponent();
         }
 
-        public class BooleanNegationConverter : IValueConverter
+        private void ListView_PreviewMouseRightButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
         {
-            public object Convert(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+            var listView = sender as ListView;
+            if (listView == null) return;
+
+            var hitTestResult = VisualTreeHelper.HitTest(listView, e.GetPosition(listView));
+            if (hitTestResult?.VisualHit == null)
             {
-                return !(bool)value;
+                listView.SelectedItem = null;
+                return;
             }
 
-            public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+            var clickedItem = VisualParentHelper.FindVisualParent<ListViewItem>(hitTestResult.VisualHit);
+
+            if (clickedItem == null)
             {
-                return !(bool)value;
+                listView.SelectedItem = null;
             }
         }
+
     }
 }

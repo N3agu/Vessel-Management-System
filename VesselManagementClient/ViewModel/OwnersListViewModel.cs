@@ -23,9 +23,10 @@ namespace VesselManagementClient.ViewModel
         public ICommand LoadOwnersCommand { get; }
         public ICommand AddOwnerCommand { get; }
         public ICommand DeleteOwnerCommand { get; }
+        public ICommand CopyCellCommand { get; }
+        public ICommand CopyRowCommand { get; }
 
-        // Event to signal opening the Add Owner window
-        public event EventHandler? RequestOpenAddOwner; // <-- NEW EVENT
+        public event EventHandler? RequestOpenAddOwner;
 
         public OwnersListViewModel(ApiService apiService)
         {
@@ -34,7 +35,8 @@ namespace VesselManagementClient.ViewModel
            
             AddOwnerCommand = new RelayCommand(_ => RequestOpenAddOwner?.Invoke(this, EventArgs.Empty));
             DeleteOwnerCommand = new RelayCommand(async _ => await DeleteOwnerAsync(), _ => SelectedOwner != null);
-
+            CopyCellCommand = new RelayCommand(CopyCell, _ => SelectedOwner != null);
+            CopyRowCommand = new RelayCommand(CopyRow, _ => SelectedOwner != null);
             _ = LoadOwnersAsync();
         }
 
@@ -62,6 +64,25 @@ namespace VesselManagementClient.ViewModel
                 if (success) { StatusMessage = $"Owner '{SelectedOwner.Name}' deleted."; await LoadOwnersAsync(); }
                 else { StatusMessage = $"Failed to delete owner: {errorMessage}"; MessageBox.Show(StatusMessage, "Delete Failed", MessageBoxButton.OK, MessageBoxImage.Error); }
                 IsLoading = false;
+            }
+        }
+
+        private void CopyCell(object? parameter)
+        {
+            if (SelectedOwner != null)
+            {
+                try { Clipboard.SetText(SelectedOwner.Name ?? string.Empty); StatusMessage = "Owner name copied."; }
+                catch (Exception ex) { StatusMessage = $"Error copying: {ex.Message}"; }
+            }
+        }
+
+        private void CopyRow(object? parameter)
+        {
+            if (SelectedOwner != null)
+            {
+                var rowText = $"ID: {SelectedOwner.Id}\tName: {SelectedOwner.Name}";
+                try { Clipboard.SetText(rowText); StatusMessage = "Owner row copied."; }
+                catch (Exception ex) { StatusMessage = $"Error copying: {ex.Message}"; }
             }
         }
     }

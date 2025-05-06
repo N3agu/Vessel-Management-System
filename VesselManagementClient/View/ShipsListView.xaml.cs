@@ -1,5 +1,7 @@
 ﻿using System.Windows.Controls;
-using System.Windows.Data;
+using System.Windows.Input;
+using System.Windows.Media;
+using VesselManagementClient.Helpers;
 
 namespace VesselManagementClient.View
 {
@@ -10,16 +12,31 @@ namespace VesselManagementClient.View
             InitializeComponent();
         }
 
-        public class BooleanNegationConverter : IValueConverter
+        private void DataGrid_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
         {
-            public object Convert(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+            var dataGrid = sender as DataGrid;
+            if (dataGrid == null) return;
+
+            var hitTestResult = VisualTreeHelper.HitTest(dataGrid, e.GetPosition(dataGrid));
+            if (hitTestResult?.VisualHit == null)
             {
-                return !(bool)value;
+                dataGrid.SelectedItem = null;
+                return;
             }
 
-            public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+            // Use the helper class here
+            var clickedRow = VisualParentHelper.FindVisualParent<DataGridRow>(hitTestResult.VisualHit);
+
+            if (clickedRow == null)
             {
-                return !(bool)value;
+                dataGrid.SelectedItem = null;
+            }
+            else
+            {
+                if (!clickedRow.IsSelected)
+                {
+                    clickedRow.IsSelected = true;
+                }
             }
         }
     }

@@ -21,7 +21,29 @@
 
         <DataGrid Grid.Row="1" ItemsSource="{Binding Ships}" SelectedItem="{Binding SelectedShip}"
                       Margin="0,0,0,10" AutoGenerateColumns="False" IsReadOnly="True"
-                      SelectionMode="Single">
+                      PreviewMouseRightButtonDown="DataGrid_PreviewMouseRightButtonDown" SelectionMode="Single">
+            <DataGrid.ContextMenu>
+                <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                    <MenuItem Header="Copy Cell"
+                                   Command="{Binding CopyCellCommand}"
+                                   CommandParameter="{Binding SelectedShip}"
+                                   IsEnabled="{Binding SelectedShip, Converter={StaticResource NullToBooleanConverter}}"/>
+                    <MenuItem Header="Copy Row"
+                                  Command="{Binding CopyRowCommand}"
+                                  CommandParameter="{Binding SelectedShip}"
+                                  IsEnabled="{Binding SelectedShip, Converter={StaticResource NullToBooleanConverter}}"/>
+                    <Separator/>
+                    <MenuItem Header="Create" Command="{Binding AddShipCommand}"/>
+                    <MenuItem Header="Edit"
+                                  Command="{Binding EditShipCommand}"
+                                  CommandParameter="{Binding SelectedShip}"
+                                  IsEnabled="{Binding SelectedShip, Converter={StaticResource NullToBooleanConverter}}"/>
+                    <MenuItem Header="Delete"
+                                  Command="{Binding DeleteShipCommand}"
+                                  CommandParameter="{Binding SelectedShip}"
+                                  IsEnabled="{Binding SelectedShip, Converter={StaticResource NullToBooleanConverter}}"/>
+                </ContextMenu>
+            </DataGrid.ContextMenu>
             <DataGrid.Columns>
                 <DataGridTextColumn Header="ID" Binding="{Binding Id}" Width="50"/>
                 <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*"/>

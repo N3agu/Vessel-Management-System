@@ -4,6 +4,7 @@ using System.Windows;
 using VesselManagementClient.Command;
 using VesselManagementClient.Services;
 using VesselManagementClient.Model;
+using System.Text;
 
 namespace VesselManagementClient.ViewModel
 {
@@ -44,6 +45,8 @@ namespace VesselManagementClient.ViewModel
         public ICommand EditShipCommand { get; }
         public ICommand DeleteShipCommand { get; }
         public ICommand ViewShipDetailsCommand { get; }
+        public ICommand CopyCellCommand { get; }
+        public ICommand CopyRowCommand { get; }
 
         // Event to signal opening the Add/Edit Ship window/view
         public event EventHandler<ShipDto?>? RequestOpenAddEditShip;
@@ -59,6 +62,8 @@ namespace VesselManagementClient.ViewModel
             EditShipCommand = new RelayCommand(_ => OpenAddEditShip(SelectedShip), _ => SelectedShip != null); // Pass selected for Edit
             DeleteShipCommand = new RelayCommand(async _ => await DeleteShipAsync(), _ => SelectedShip != null);
             ViewShipDetailsCommand = new RelayCommand(_ => OpenShipDetails(SelectedShip), _ => SelectedShip != null);
+            CopyCellCommand = new RelayCommand(CopyCell, _ => SelectedShip != null);
+            CopyRowCommand = new RelayCommand(CopyRow, _ => SelectedShip != null);
 
             // Load initially
             _ = LoadShipsAsync();
@@ -123,6 +128,30 @@ namespace VesselManagementClient.ViewModel
                     MessageBox.Show(StatusMessage, "Delete Failed", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
                 IsLoading = false;
+            }
+        }
+
+        private void CopyCell(object? parameter)
+        {
+            if (SelectedShip != null)
+            {
+                try { Clipboard.SetText(SelectedShip.Name ?? string.Empty); StatusMessage = "Ship name copied."; }
+                catch (Exception ex) { StatusMessage = $"Error copying: {ex.Message}"; }
+            }
+        }
+
+        private void CopyRow(object? parameter)
+        {
+            if (SelectedShip != null)
+            {
+                var sb = new StringBuilder();
+                sb.Append($"ID: {SelectedShip.Id}\t");
+                sb.Append($"Name: {SelectedShip.Name}\t");
+                sb.Append($"IMO: {SelectedShip.ImoNumber}\t");
+                sb.Append($"Type: {SelectedShip.Type}\t");
+                sb.Append($"Tonnage: {SelectedShip.Tonnage:N2}");
+                try { Clipboard.SetText(sb.ToString()); StatusMessage = "Ship row copied."; }
+                catch (Exception ex) { StatusMessage = $"Error copying: {ex.Message}"; }
             }
         }
     }
