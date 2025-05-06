@@ -24,7 +24,6 @@ namespace VesselManagementClient.ViewModel
         public ShipDto? SelectedShip
         {
             get => _selectedShip;
-            // When selection changes, potentially load details
             set => SetProperty(ref _selectedShip, value);
         }
 
@@ -66,7 +65,6 @@ namespace VesselManagementClient.ViewModel
         }
 
         public ShipsListViewModel() : this(new ApiService()) { } // Default constructor for XAML designer
-
 
         public async Task LoadShipsAsync()
         {
@@ -117,7 +115,7 @@ namespace VesselManagementClient.ViewModel
                 if (success)
                 {
                     StatusMessage = $"Ship '{SelectedShip.Name}' deleted.";
-                    await LoadShipsAsync(); // Refresh the list
+                    await LoadShipsAsync();
                 }
                 else
                 {

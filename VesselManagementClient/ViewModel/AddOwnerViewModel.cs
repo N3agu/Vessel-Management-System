@@ -30,7 +30,6 @@ namespace VesselManagementClient.ViewModel
         public ICommand SaveCommand { get; }
         public ICommand CancelCommand { get; }
 
-        // Event to signal closing the window
         public event EventHandler? RequestClose;
 
         public AddOwnerViewModel(ApiService apiService)
@@ -44,7 +43,6 @@ namespace VesselManagementClient.ViewModel
 
         private bool CanSave()
         {
-            // Basic validation
             return !string.IsNullOrWhiteSpace(OwnerName) && OwnerName.Length <= 100 && !IsLoading;
         }
 
@@ -60,7 +58,7 @@ namespace VesselManagementClient.ViewModel
             {
                 StatusMessage = "Save successful!";
                 MessageBox.Show("Owner saved successfully!", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
-                RequestClose?.Invoke(this, EventArgs.Empty); // Close window on success
+                RequestClose?.Invoke(this, EventArgs.Empty);
             }
             else
             {

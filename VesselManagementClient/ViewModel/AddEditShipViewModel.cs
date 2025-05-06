@@ -28,7 +28,7 @@ namespace VesselManagementClient.ViewModel
     public class AddEditShipViewModel : BaseViewModel
     {
         private readonly ApiService _apiService;
-        private ShipDto? _originalShip; // Keep track if editing
+        private ShipDto? _originalShip;
         private bool _isEditMode => _originalShip != null;
 
         private string _windowTitle = "Add New Ship";
@@ -83,9 +83,8 @@ namespace VesselManagementClient.ViewModel
 
 
         public ICommand SaveCommand { get; }
-        public ICommand CancelCommand { get; } // Maybe just close the window
+        public ICommand CancelCommand { get; }
 
-        // Event to signal closing the window
         public event EventHandler? RequestClose;
 
 
@@ -105,17 +104,15 @@ namespace VesselManagementClient.ViewModel
                 ImoNumber = _originalShip.ImoNumber;
                 ShipType = _originalShip.Type;
                 Tonnage = _originalShip.Tonnage;
-                // Owner selection disabled in edit mode for simplicity (matches API)
             }
             else
             {
                 WindowTitle = "Add New Ship";
-                // Load owners only needed for Add mode
                 _ = LoadAvailableOwnersAsync();
             }
         }
 
-        public AddEditShipViewModel() : this(new ApiService()) { } // For designer
+        public AddEditShipViewModel() : this(new ApiService()) { }
 
         private async Task LoadAvailableOwnersAsync()
         {
@@ -140,8 +137,7 @@ namespace VesselManagementClient.ViewModel
 
         private bool CanSave()
         {
-            // Basic client-side check - more robust validation can be added
-            bool ownersSelected = _isEditMode || SelectedOwnerIds.Any(); // Must select owners in Add mode
+            bool ownersSelected = _isEditMode || SelectedOwnerIds.Any();
             return !string.IsNullOrWhiteSpace(ShipName) &&
                    !string.IsNullOrWhiteSpace(ImoNumber) && ImoNumber.Length == 7 && int.TryParse(ImoNumber, out _) &&
                    !string.IsNullOrWhiteSpace(ShipType) &&
@@ -169,12 +165,12 @@ namespace VesselManagementClient.ViewModel
                         Type = this.ShipType,
                         Tonnage = this.Tonnage
                     };
-                    // Validate DTO (optional here, relies on API validation mostly)
+
                     var (updateSuccess, updateError) = await _apiService.UpdateShipAsync(this.ShipId, updateDto);
                     success = updateSuccess;
                     errorMessage = updateError;
                 }
-                else // Add Mode
+                else
                 {
                     if (!SelectedOwnerIds.Any())
                     {
@@ -192,7 +188,7 @@ namespace VesselManagementClient.ViewModel
                         Tonnage = this.Tonnage,
                         OwnerIds = this.SelectedOwnerIds
                     };
-                    // Validate DTO
+
                     var (createdShip, createError) = await _apiService.CreateShipAsync(createDto);
                     success = createdShip != null;
                     errorMessage = createError;

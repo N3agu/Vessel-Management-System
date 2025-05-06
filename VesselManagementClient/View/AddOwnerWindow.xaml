@@ -8,7 +8,7 @@
             xmlns:ui="http://schemas.modernwpf.com/2019"
             mc:Ignorable="d"
             ui:WindowHelper.UseModernWindowStyle="True"
-            Title="{Binding WindowTitle}" Height="250" Width="400"
+            Title="{Binding WindowTitle}" Height="165" Width="400"
             WindowStartupLocation="CenterOwner" ResizeMode="NoResize" ShowInTaskbar="False"
             d:DataContext="{d:DesignInstance Type=vm:AddOwnerViewModel, IsDesignTimeCreatable=True}">
     <Grid Margin="15">

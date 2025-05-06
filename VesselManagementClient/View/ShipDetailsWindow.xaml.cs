@@ -3,9 +3,9 @@ using VesselManagementClient.ViewModel;
 
 namespace VesselManagementClient.View
 {
-    public partial class ShipDetailsDialog : Window
+    public partial class ShipDetailsWindow : Window
     {
-        public ShipDetailsDialog(ShipDetailsDialogViewModel viewModel)
+        public ShipDetailsWindow(ShipDetailsViewModel viewModel)
         {
             InitializeComponent();
             this.DataContext = viewModel;

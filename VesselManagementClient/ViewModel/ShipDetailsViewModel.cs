@@ -5,7 +5,7 @@ using VesselManagementClient.Services;
 
 namespace VesselManagementClient.ViewModel
 {
-    public class ShipDetailsDialogViewModel : BaseViewModel
+    public class ShipDetailsViewModel : BaseViewModel
     {
         private readonly ApiService _apiService;
         private ShipDetailsDto? _shipDetails;
@@ -34,14 +34,14 @@ namespace VesselManagementClient.ViewModel
         public event EventHandler? RequestClose;
 
 
-        public ShipDetailsDialogViewModel(ApiService apiService, int shipId)
+        public ShipDetailsViewModel(ApiService apiService, int shipId)
         {
             _apiService = apiService;
             CloseCommand = new RelayCommand(_ => RequestClose?.Invoke(this, EventArgs.Empty));
             _ = LoadDetailsAsync(shipId);
         }
 
-        public ShipDetailsDialogViewModel() : this(new ApiService(), 0) { } // For designer
+        public ShipDetailsViewModel() : this(new ApiService(), 0) { }
 
         private async Task LoadDetailsAsync(int shipId)
         {

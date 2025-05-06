@@ -1,4 +1,4 @@
-﻿<Window x:Class="VesselManagementClient.View.ShipDetailsDialog"
+﻿<Window x:Class="VesselManagementClient.View.ShipDetailsWindow"
             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -10,7 +10,7 @@
             ui:WindowHelper.UseModernWindowStyle="True"
             Title="Ship Details" Height="400" Width="400"
             WindowStartupLocation="CenterOwner" ResizeMode="NoResize" ShowInTaskbar="False"
-            d:DataContext="{d:DesignInstance Type=vm:ShipDetailsDialogViewModel, IsDesignTimeCreatable=True}">
+            d:DataContext="{d:DesignInstance Type=vm:ShipDetailsViewModel, IsDesignTimeCreatable=True}">
     <Grid Margin="15">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>

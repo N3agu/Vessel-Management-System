@@ -53,7 +53,7 @@
             </ListView.ItemTemplate>
         </ListView>
 
-        <StackPanel Grid.Row="6" Grid.Column="0" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,15,0,5">
+        <StackPanel Grid.Row="6" Grid.Column="0" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,5,0,5">
             <ui:ProgressRing IsActive="{Binding IsLoading}" Height="20" Width="20" Margin="0,0,10,0" VerticalAlignment="Center"/>
             <Button Content="_Save" Command="{Binding SaveCommand}" IsDefault="True" Style="{StaticResource AccentButtonStyle}" MinWidth="75" Margin="0,0,10,0"/>
             <Button Content="_Cancel" Command="{Binding CancelCommand}" IsCancel="True" MinWidth="75"/>
