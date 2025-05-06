@@ -6,7 +6,12 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
+    <ApplicationIcon>Assets\favicon.ico</ApplicationIcon>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="Assets\favicon.ico" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="ModernWpfUI" Version="0.9.6" />
